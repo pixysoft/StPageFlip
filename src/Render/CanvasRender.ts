@@ -22,6 +22,36 @@ export class CanvasRender extends Render {
         return this.ctx;
     }
 
+    /**
+     * 小程序 canvas 自带 requestAnimationFrame；没有再用全局。
+     * @param {(timer: number) => void} cb
+     * @returns {number}
+     */
+    protected scheduleFrame(cb: (timer: number) => void): number {
+        const host = this.canvas as HTMLCanvasElement & {
+            requestAnimationFrame?: (fn: (timer: number) => void) => number;
+        };
+        if (host && typeof host.requestAnimationFrame === 'function') {
+            return host.requestAnimationFrame(cb);
+        }
+        return super.scheduleFrame(cb);
+    }
+
+    /**
+     * @param {number} id - scheduleFrame 返回值
+     * @returns {void}
+     */
+    protected cancelFrame(id: number): void {
+        const host = this.canvas as HTMLCanvasElement & {
+            cancelAnimationFrame?: (handle: number) => void;
+        };
+        if (host && typeof host.cancelAnimationFrame === 'function') {
+            host.cancelAnimationFrame(id);
+            return;
+        }
+        super.cancelFrame(id);
+    }
+
     public reload(): void {
         //
     }

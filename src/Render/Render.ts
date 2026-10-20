@@ -82,6 +82,9 @@ export abstract class Render {
 
     /** Timer started from start of rendering */
     protected timer = 0;
+    /** 渲染循环是否还在跑。destroy 时停掉 */
+    private alive = false;
+    private frameId = 0;
 
     /**
      * Safari browser definitions for resolving a bug with a css property clip-area
@@ -94,9 +97,12 @@ export abstract class Render {
         this.setting = setting;
         this.app = app;
 
-        // detect safari
-        const regex = new RegExp('Version\\/[\\d\\.]+.*Safari/');
-        this.safari = regex.exec(window.navigator.userAgent) !== null;
+        // 小程序没有 window。仅浏览器检测 Safari 的 clip 问题
+        const ua =
+            typeof window !== 'undefined' && window.navigator
+                ? window.navigator.userAgent || ''
+                : '';
+        this.safari = /Version\/[\d.]+.*Safari/.test(ua);
     }
 
     /**
@@ -136,15 +142,47 @@ export abstract class Render {
     /**
      * Running requestAnimationFrame, and rendering process
      */
+    /**
+     * 下一帧。子类可改用 canvas.requestAnimationFrame。
+     * @param {(timer: number) => void} cb
+     * @returns {number} 帧句柄
+     */
+    protected scheduleFrame(cb: (timer: number) => void): number {
+        if (typeof requestAnimationFrame === 'function') return requestAnimationFrame(cb);
+        return setTimeout(() => cb(Date.now()), 16) as unknown as number;
+    }
+
+    /**
+     * 取消 scheduleFrame 返回的句柄。
+     * @param {number} id
+     * @returns {void}
+     */
+    protected cancelFrame(id: number): void {
+        if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(id);
+        else clearTimeout(id);
+    }
+
+    /**
+     * 停止渲染循环。不销毁 canvas。
+     * @returns {void}
+     */
+    public stop(): void {
+        this.alive = false;
+        this.cancelFrame(this.frameId);
+    }
+
     public start(): void {
+        if (this.alive) return;
+        this.alive = true;
         this.update();
 
         const loop = (timer: number): void => {
+            if (!this.alive) return;
             this.render(timer);
-            requestAnimationFrame(loop);
+            this.frameId = this.scheduleFrame(loop);
         };
 
-        requestAnimationFrame(loop);
+        this.frameId = this.scheduleFrame(loop);
     }
 
     /**

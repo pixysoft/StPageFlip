@@ -1,5 +1,5 @@
 {
-    "files": ["src/PageFlip.ts", "src/BasicTypes.ts"],
+    "files": ["src/PageFlip.ts", "src/BasicTypes.ts", "src/browser.ts", "src/mini.ts"],
     "compilerOptions": {
         "declaration": true,
         "declarationDir": "dist",

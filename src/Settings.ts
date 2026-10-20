@@ -57,6 +57,11 @@ export interface FlipSetting {
 
     /** if this value is true, flipping by clicking on the whole book will be locked. Only on corners */
     disableFlipByClick: boolean;
+
+    /** 页面图片加载完成前填充的占位底色 */
+    loaderColor: string;
+    /** 占位块边框色 */
+    loaderBorderColor: string;
 }
 
 export class Settings {
@@ -82,6 +87,8 @@ export class Settings {
         useMouseEvents: true,
         showPageCorners: true,
         disableFlipByClick: false,
+        loaderColor: '#f2f2f2',
+        loaderBorderColor: '#d0d0d0',
     };
 
     /**

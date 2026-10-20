@@ -17,8 +17,9 @@ export class ImagePageCollection extends PageCollection {
     }
 
     public load(): void {
+        const createImage = this.app.getImageFactory() || undefined;
         for (const href of this.imagesHref) {
-            const page = new ImagePage(this.render, href, PageDensity.SOFT);
+            const page = new ImagePage(this.render, href, PageDensity.SOFT, createImage);
 
             page.load();
             this.pages.push(page);

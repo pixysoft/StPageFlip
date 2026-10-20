@@ -13,8 +13,7 @@ import { EventObject } from './Event/EventObject';
 import { HTMLRender } from './Render/HTMLRender';
 import { FlipSetting, Settings } from './Settings';
 import { UI } from './UI/UI';
-
-import './Style/stPageFlip.css';
+import { MiniCanvasUI, MiniCanvas } from './UI/MiniCanvasUI';
 
 /**
  * Class representing a main PageFlip object
@@ -27,22 +26,25 @@ export class PageFlip extends EventObject {
     private isUserMove = false;
 
     private readonly setting: FlipSetting = null;
-    private readonly block: HTMLElement; // Root HTML Element
+    /** 浏览器根节点。小程序模式为 null，不创建、不删除 DOM */
+    private readonly block: HTMLElement | null;
+    /** 小程序用 canvas.createImage；浏览器为 null，仍 new Image() */
+    private imageFactory: (() => HTMLImageElement) | null = null;
 
     private pages: PageCollection = null;
     private flipController: Flip;
     private render: Render;
 
-    private ui: UI;
+    private ui: UI | MiniCanvasUI;
 
     /**
      * Create a new PageFlip instance
      *
      * @constructor
-     * @param {HTMLElement} inBlock - Root HTML Element
+     * @param {HTMLElement | null} inBlock - 浏览器根节点；小程序传 null
      * @param {Object} setting - Configuration object
      */
-    constructor(inBlock: HTMLElement, setting: Partial<FlipSetting>) {
+    constructor(inBlock: HTMLElement | null, setting: Partial<FlipSetting>) {
         super();
 
         this.setting = new Settings().getSettings(setting);
@@ -53,8 +55,10 @@ export class PageFlip extends EventObject {
      * Destructor. Remove a root HTML element and all event handlers
      */
     public destroy(): void {
-        this.ui.destroy();
-        this.block.remove();
+        if (this.render) this.render.stop();
+        if (this.ui) this.ui.destroy();
+        // 只删除库自己挂上的浏览器根节点；外部传入的小程序 canvas 不 remove
+        if (this.block) this.block.remove();
     }
 
     /**
@@ -70,6 +74,43 @@ export class PageFlip extends EventObject {
      *
      * @param {string[]} imagesHref - List of paths to images
      */
+    /**
+     * 小程序：使用页面已有的 2d canvas 加载图片页，不创建 DOM。
+     * @param {MiniCanvas} canvas - type=2d 节点
+     * @param {number} width - 显示宽度（像素），同时作为缓冲宽度
+     * @param {number} height - 显示高度（像素）
+     * @param {string[]} imagesHref - 页图地址，顺序即页序
+     * @returns {void}
+     */
+    public loadFromMiniCanvas(
+        canvas: MiniCanvas,
+        width: number,
+        height: number,
+        imagesHref: string[]
+    ): void {
+        this.imageFactory = (): HTMLImageElement => {
+            if (typeof canvas.createImage === 'function') return canvas.createImage();
+            return new Image();
+        };
+        this.ui = new MiniCanvasUI(canvas, width, height);
+
+        const view = (this.ui as MiniCanvasUI).getCanvas();
+        this.render = new CanvasRender(this, this.setting, view as HTMLCanvasElement);
+        this.flipController = new Flip(this.render, this);
+        this.pages = new ImagePageCollection(this, this.render, imagesHref);
+        this.pages.load();
+        this.render.start();
+        this.pages.show(this.setting.startPage);
+
+        setTimeout(() => {
+            this.ui.update();
+            this.trigger('init', this, {
+                page: this.setting.startPage,
+                mode: this.render.getOrientation(),
+            });
+        }, 1);
+    }
+
     public loadFromImages(imagesHref: string[]): void {
         this.ui = new CanvasUI(this.block, this, this.setting);
 
@@ -152,7 +193,9 @@ export class PageFlip extends EventObject {
         const current = this.pages.getCurrentPageIndex();
 
         this.pages.destroy();
-        this.pages = new HTMLPageCollection(this, this.render, this.ui.getDistElement(), items);
+        // HTML 模式的 dist 一定是元素；小程序 UI 不会走到这里
+        const dist = (this.ui as HTMLUI).getDistElement();
+        this.pages = new HTMLPageCollection(this, this.render, dist, items);
         this.pages.load();
         (this.ui as HTMLUI).updateItems(items);
         this.render.reload();
@@ -330,8 +373,20 @@ export class PageFlip extends EventObject {
      *
      * @returns {UI}
      */
-    public getUI(): UI {
+    /**
+     * 浏览器返回 DOM UI；小程序返回外部 canvas 的尺寸壳。
+     * @returns {UI | MiniCanvasUI}
+     */
+    public getUI(): UI | MiniCanvasUI {
         return this.ui;
+    }
+
+    /**
+     * 小程序创图函数；浏览器为 null。
+     * @returns {(() => HTMLImageElement) | null}
+     */
+    public getImageFactory(): (() => HTMLImageElement) | null {
+        return this.imageFactory;
     }
 
     /**

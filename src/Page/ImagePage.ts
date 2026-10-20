@@ -8,15 +8,27 @@ import { Point } from '../BasicTypes';
  */
 export class ImagePage extends Page {
     private readonly image: HTMLImageElement = null;
+    private readonly href: string;
     private isLoad = false;
 
     private loadingAngle = 0;
 
-    constructor(render: Render, href: string, density: PageDensity) {
+    /**
+     * @param {Render} render
+     * @param {string} href - 图片地址
+     * @param {PageDensity} density
+     * @param {() => HTMLImageElement} [createImage] - 小程序传入 canvas.createImage
+     */
+    constructor(
+        render: Render,
+        href: string,
+        density: PageDensity,
+        createImage?: () => HTMLImageElement
+    ) {
         super(render, density);
 
-        this.image = new Image();
-        this.image.src = href;
+        this.href = href;
+        this.image = createImage ? createImage() : new Image();
     }
 
     public draw(tempDensity?: PageDensity): void {
@@ -75,8 +87,9 @@ export class ImagePage extends Page {
         pageHeight: number
     ): void {
         ctx.beginPath();
-        ctx.strokeStyle = 'rgb(200, 200, 200)';
-        ctx.fillStyle = 'rgb(255, 255, 255)';
+        const setting = this.render.getSettings();
+        ctx.strokeStyle = setting.loaderBorderColor;
+        ctx.fillStyle = setting.loaderColor;
         ctx.lineWidth = 1;
         ctx.rect(shiftPos.x + 1, shiftPos.y + 1, pageWidth - 1, pageHeight - 1);
         ctx.stroke();
@@ -106,10 +119,12 @@ export class ImagePage extends Page {
     }
 
     public load(): void {
-        if (!this.isLoad)
-            this.image.onload = (): void => {
-                this.isLoad = true;
-            };
+        if (this.isLoad) return;
+        // 先挂 onload 再设 src，避免缓存图在赋值前就加载完
+        this.image.onload = (): void => {
+            this.isLoad = true;
+        };
+        this.image.src = this.href;
     }
 
     public newTemporaryCopy(): Page {
