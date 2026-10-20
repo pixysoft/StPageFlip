@@ -267,6 +267,14 @@ export class PageFlip extends EventObject {
     }
 
     /**
+     * 立即中止进行中的翻页动画，不翻页。
+     * @returns {void}
+     */
+    public cancelAnimation(): void {
+        this.flipController.cancelAnimation();
+    }
+
+    /**
      * Call a state change event trigger
      *
      * @param {FlippingState} newState - New  state of the object

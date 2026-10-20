@@ -85,6 +85,8 @@ export abstract class Render {
     /** 渲染循环是否还在跑。destroy 时停掉 */
     private alive = false;
     private frameId = 0;
+    /** 渲染异常只报一次，避免刷屏 */
+    private renderErrorLogged = false;
 
     /**
      * Safari browser definitions for resolving a bug with a css property clip-area
@@ -121,22 +123,31 @@ export abstract class Render {
      * @param timer
      */
     private render(timer: number): void {
-        if (this.animation !== null) {
-            // Find current frame of animation
-            const frameIndex = Math.round(
-                (timer - this.animation.startedAt) / this.animation.durationFrame
-            );
+        // drawFrame 抛错会冲出循环，导致 start() 不再排下一帧，画面永久冻结
+        try {
+            if (this.animation !== null) {
+                // 小程序 canvas.requestAnimationFrame 的回调不保证传入时间戳，
+                // 若用 timer 计算会出现 NaN（首帧直接结束动画，看不到翻页）。
+                // 动画进度统一用本地时钟驱动。
+                const elapsed = Math.max(0, Date.now() - this.animation.startedAt);
+                const frameIndex = Math.floor(elapsed / this.animation.durationFrame);
 
-            if (frameIndex < this.animation.frames.length) {
-                this.animation.frames[frameIndex]();
-            } else {
-                this.animation.onAnimateEnd();
-                this.animation = null;
+                if (frameIndex < this.animation.frames.length) {
+                    this.animation.frames[frameIndex]();
+                } else {
+                    this.animation.onAnimateEnd();
+                    this.animation = null;
+                }
+            }
+
+            this.timer = typeof timer === 'number' ? timer : Date.now();
+            this.drawFrame();
+        } catch (err) {
+            if (!this.renderErrorLogged) {
+                this.renderErrorLogged = true;
+                console.error('[page-flip] drawFrame failed', err);
             }
         }
-
-        this.timer = timer;
-        this.drawFrame();
     }
 
     /**
@@ -204,7 +215,8 @@ export abstract class Render {
             duration,
             durationFrame: duration / frames.length,
             onAnimateEnd,
-            startedAt: this.timer,
+            // 与 render() 的本地时钟一致；不再依赖 rAF 回调时间戳
+            startedAt: Date.now(),
         };
     }
 
@@ -220,6 +232,14 @@ export abstract class Render {
             }
         }
 
+        this.animation = null;
+    }
+
+    /**
+     * 立即丢弃当前动画：不执行末帧、不触发 onAnimateEnd。
+     * @returns {void}
+     */
+    public cancelAnimation(): void {
         this.animation = null;
     }
 

@@ -53,7 +53,7 @@ export class ImagePage extends Page {
 
         ctx.clip();
 
-        if (!this.isLoad) {
+        if (!this.isReady()) {
             this.drawLoader(ctx, { x: 0, y: 0 }, pageWidth, pageHeight);
         } else {
             ctx.drawImage(this.image, 0, 0, pageWidth, pageHeight);
@@ -73,11 +73,24 @@ export class ImagePage extends Page {
 
         const y = rect.top;
 
-        if (!this.isLoad) {
+        if (!this.isReady()) {
             this.drawLoader(ctx, { x, y }, pageWidth, pageHeight);
         } else {
             ctx.drawImage(this.image, x, y, pageWidth, pageHeight);
         }
+    }
+
+    /**
+     * 图片是否已真正可绘制。小程序里对未加载完或 0 尺寸图片 drawImage 会抛错
+     * @returns {boolean}
+     */
+    private isReady(): boolean {
+        return (
+            this.isLoad &&
+            this.image !== null &&
+            this.image.width > 0 &&
+            this.image.height > 0
+        );
     }
 
     private drawLoader(
@@ -120,9 +133,17 @@ export class ImagePage extends Page {
 
     public load(): void {
         if (this.isLoad) return;
+        // 空地址设 src 不会触发 onload，只会永远停在 loader
+        if (!this.href) {
+            console.warn('[page-flip] empty image href, keep loader');
+            return;
+        }
         // 先挂 onload 再设 src，避免缓存图在赋值前就加载完
         this.image.onload = (): void => {
             this.isLoad = true;
+        };
+        this.image.onerror = (): void => {
+            console.warn('[page-flip] image load failed', this.href);
         };
         this.image.src = this.href;
     }

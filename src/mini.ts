@@ -31,6 +31,10 @@ export type MiniPageFlip = {
     flip(page: number, corner?: FlipCorner): void;
     /** 无动画跳页 */
     turnToPage(page: number): void;
+    /** 调整单段卷页时长（毫秒）。实际时长还按翻页路径长度缩放 */
+    setFlippingTime(ms: number): void;
+    /** 中止进行中的翻页动画（不翻页、不触发 flip） */
+    cancelAnimation(): void;
     getCurrentPageIndex(): number;
     getPageCount(): number;
     on(eventName: string, callback: (e: { data: unknown; object: PageFlip }) => void): void;
@@ -101,6 +105,14 @@ export function createMiniPageFlip(
         },
         turnToPage(page: number): void {
             if (ready) app.turnToPage(page);
+        },
+        setFlippingTime(ms: number): void {
+            const t = Math.round(Number(ms));
+            if (!Number.isFinite(t) || t <= 0) return;
+            app.getSettings().flippingTime = t;
+        },
+        cancelAnimation(): void {
+            if (ready) app.cancelAnimation();
         },
         getCurrentPageIndex(): number {
             return ready ? app.getCurrentPageIndex() : 0;

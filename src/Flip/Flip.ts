@@ -75,9 +75,13 @@ export class Flip {
      * Page turning with animation
      *
      * @param globalPos - Touch Point Coordinates (relative window)
+     * @param force - 程序化翻页时为 true，跳过点击区域检查（否则会被静默拦截）
      */
-    public flip(globalPos: Point): void {
-        if (this.app.getSettings().disableFlipByClick && !this.isPointOnCorners(globalPos)) return;
+    public flip(globalPos: Point, force = false): void {
+        if (!force && this.app.getSettings().disableFlipByClick && !this.isPointOnCorners(globalPos)) {
+            console.warn('[page-flip] flip ignored: point is not on corners');
+            return;
+        }
 
         // the flipiing process is already running
         if (this.calc !== null) this.render.finishAnimation();
@@ -212,6 +216,19 @@ export class Flip {
     }
 
     /**
+     * 立即中止翻页动画：不翻页、不回调，画面回到静止状态。
+     * @returns {void}
+     */
+    public cancelAnimation(): void {
+        this.render.cancelAnimation();
+        this.render.setBottomPage(null);
+        this.render.setFlippingPage(null);
+        this.render.clearShadow();
+        this.setState(FlippingState.READ);
+        this.reset();
+    }
+
+    /**
      * Turn to the specified page number (with animation)
      *
      * @param {number} page - New page number
@@ -241,10 +258,13 @@ export class Flip {
      * @param {FlipCorner} corner - Active page corner when turning
      */
     public flipNext(corner: FlipCorner): void {
-        this.flip({
-            x: this.render.getRect().left + this.render.getRect().pageWidth * 2 - 10,
-            y: corner === FlipCorner.TOP ? 1 : this.render.getRect().height - 2,
-        });
+        this.flip(
+            {
+                x: this.render.getRect().left + this.render.getRect().pageWidth * 2 - 10,
+                y: corner === FlipCorner.TOP ? 1 : this.render.getRect().height - 2,
+            },
+            true
+        );
     }
 
     /**
@@ -253,10 +273,13 @@ export class Flip {
      * @param {FlipCorner} corner - Active page corner when turning
      */
     public flipPrev(corner: FlipCorner): void {
-        this.flip({
-            x: 10,
-            y: corner === FlipCorner.TOP ? 1 : this.render.getRect().height - 2,
-        });
+        this.flip(
+            {
+                x: 10,
+                y: corner === FlipCorner.TOP ? 1 : this.render.getRect().height - 2,
+            },
+            true
+        );
     }
 
     /**
