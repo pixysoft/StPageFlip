@@ -169,10 +169,11 @@ export class CanvasRender extends Render {
         if (this.shadow.direction === FlipDirection.FORWARD) {
             this.ctx.translate(-isw, -100);
 
-            innerGradient.addColorStop(1, 'rgba(0, 0, 0, ' + this.shadow.opacity + ')');
-            innerGradient.addColorStop(0.9, 'rgba(0, 0, 0, 0.05)');
-            innerGradient.addColorStop(0.7, 'rgba(0, 0, 0, ' + this.shadow.opacity + ')');
+            // 色标必须严格升序：WebKit 的 CanvasGradient 不排序，降序会交给 CGGradient 产生色阶跳变
             innerGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            innerGradient.addColorStop(0.7, 'rgba(0, 0, 0, ' + this.shadow.opacity + ')');
+            innerGradient.addColorStop(0.9, 'rgba(0, 0, 0, 0.05)');
+            innerGradient.addColorStop(1, 'rgba(0, 0, 0, ' + this.shadow.opacity + ')');
         } else {
             this.ctx.translate(0, -100);
 
